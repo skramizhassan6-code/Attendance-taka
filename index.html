@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Multi-User Tracker</title>
+    <style>
+        body { font-family: 'Roboto', Arial, sans-serif; background-color: #f1f3f6; margin: 0; padding: 10px; }
+        
+        /* --- LOGIN & SIGNUP UI --- */
+        #loginOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #2874f0; display: flex; justify-content: center; align-items: center;
+            z-index: 9999; flex-direction: column; color: white;
+        }
+        .login-box {
+            background: white; padding: 35px 25px; border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 92%; max-width: 360px;
+            text-align: center; box-sizing: border-box; color: #333;
+        }
+        .login-box h2 { color: #2874f0; margin-bottom: 25px; font-size: 24px; font-weight: bold; }
+        .login-box input {
+            width: 100%; padding: 15px; margin-bottom: 18px; border: 2px solid #eee; 
+            border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #f9f9f9;
+        }
+        .login-box button {
+            width: 100%; padding: 15px; background: #2874f0; color: white; 
+            border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 17px;
+        }
+        .toggle-link { display: block; margin-top: 20px; color: #2874f0; font-size: 14px; cursor: pointer; text-decoration: none; }
+
+        /* --- TRACKER UI --- */
+        #mainContent { display: none; }
+        .widget-container { position: fixed; top: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 5px; width: calc(100% - 20px); max-width: 400px; }
+        .header-info { background: #fff; padding: 8px; border-radius: 4px; border: 1.5px solid #2874f0; color: #2874f0; font-weight: bold; font-size: 14px; text-align: center; }
+        .std-hour-box { background: #2874f0; padding: 8px; border-radius: 4px; border: 1.5px solid #1a54b8; color: white; display: flex; align-items: center; gap: 8px; }
+        .your-std-display { background: #fff; padding: 4px 10px; border: 1.5px solid #2874f0; border-radius: 4px; font-weight: bold; color: #2874f0; font-size: 12px; }
+        
+        #privateSalarySection { display: none; background: #fff; padding: 10px; border: 1.5px solid #4CAF50; border-radius: 6px; margin-top: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .salary-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 2px; }
+        
+        .table-container { margin-top: 200px; max-width: 600px; background: white; padding: 10px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 4px; text-align: center; font-size: 11px; }
+        th { background-color: #2874f0; color: white; }
+        
+        input[type="text"].in-out-input { width: 55px; padding: 3px; text-align: center; border: 1px solid #ccc; font-size: 11px; }
+        .btn-view-sal { background-color: #4CAF50; color: white; border: none; padding: 5px 10px; cursor: pointer; font-size: 10px; border-radius: 4px; font-weight: bold; }
+        .btn-lock { background-color: #2874f0; color: white; border: none; padding: 3px 6px; cursor: pointer; font-size: 10px; border-radius: 3px; }
+        .logout-btn { background-color: #ff4444; color: white; border: none; padding: 5px 10px; cursor: pointer; font-size: 10px; border-radius: 4px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2 id="boxTitle">Account Login</h2>
+            <div id="loginForm">
+                <input type="text" id="userInp" placeholder="Username">
+                <input type="password" id="passInp" placeholder="Password">
+                <button onclick="checkLogin()">Login Now</button>
+                <span class="toggle-link" onclick="toggleForm('signup')">Create New Account</span>
+                <span class="toggle-link" style="font-size:12px; color:#888;" onclick="toggleForm('forgot')">Forgot Password?</span>
+            </div>
+            <div id="signupForm" style="display:none;">
+                <input type="text" id="newWebUser" placeholder="Set Username">
+                <input type="password" id="newWebPass" placeholder="Set Password">
+                <button onclick="saveSignup()">Register Account</button>
+                <span class="toggle-link" onclick="toggleForm('login')">Back to Login</span>
+            </div>
+            <div id="forgotForm" style="display:none;">
+                <input type="text" id="forgotUser" placeholder="Confirm Username">
+                <div id="otpBox" style="display:none;"><input type="number" id="otpInp" placeholder="Enter OTP"> <button onclick="verifyOTP()">Verify OTP</button></div>
+                <button id="otpBtn" onclick="requestOTP()">Get Mock OTP</button>
+                <span class="toggle-link" onclick="location.reload()">Cancel</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainContent">
+        <div class="widget-container">
+            <div class="header-info">👤 User: <span id="currentUserDisplay">...</span></div>
+            <div style="display:flex; gap:5px;">
+                <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+                <button class="btn-view-sal" onclick="unlockSalary()">🔒 View Salary</button>
+            </div>
+
+            <div class="std-hour-box">
+                <span style="font-size: 10px; font-weight: bold;">Std Hr:</span>
+                <input type="number" id="targetHour" value="200" oninput="calculate()" style="width:35px; font-size: 10px;">
+                
+                <select id="monthSelect" onchange="generateTable(); loadFromStorage();" style="padding: 2px; font-size: 10px;">
+                    <option value="January">January</option>
+                    <option value="February">February</option>
+                    <option value="March" selected>March</option>
+                    <option value="April">April</option>
+                    <option value="May">May</option>
+                    <option value="June">June</option>
+                    <option value="July">July</option>
+                    <option value="August">August</option>
+                    <option value="September">September</option>
+                    <option value="October">October</option>
+                    <option value="November">November</option>
+                    <option value="December">December</option>
+                </select>
+            </div>
+
+            <div class="your-std-display">Total Working Hours: <span id="totalDisplay">0.00</span> hrs</div>
+
+            <div id="privateSalarySection">
+                <div class="salary-row"><span>Monthly Basic:</span><input type="number" id="baseSalary" value="8000" oninput="calculate()" style="width:60px;"></div>
+                <div class="salary-row"><span>Extra Hrs (Double OT):</span> <span id="otPayDisplay">₹0.00</span></div>
+                <div class="salary-row"><span>Night Allowance (₹150):</span> <span id="nightPayDisplay">₹0.00</span></div>
+                <div style="font-size: 14px; color: #4CAF50; font-weight: bold; text-align: center; margin-top: 5px;">Total Salary: ₹<span id="salaryDisplay">0.00</span></div>
+                <button onclick="document.getElementById('privateSalarySection').style.display='none'" style="width:100%; margin-top:8px; font-size: 9px; cursor:pointer;">Close</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Date</th><th>In</th><th>Out</th><th>Total</th><th>Night</th><th>Lock</th></tr></thead>
+                <tbody id="attendance-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let currentActiveUser = "";
+        let generatedOTP = "";
+
+        function toggleForm(type) {
+            document.getElementById('loginForm').style.display = type === 'login' ? 'block' : 'none';
+            document.getElementById('signupForm').style.display = type === 'signup' ? 'block' : 'none';
+            document.getElementById('forgotForm').style.display = type === 'forgot' ? 'block' : 'none';
+            document.getElementById('boxTitle').innerText = type.toUpperCase();
+        }
+
+        function saveSignup() {
+            let u = document.getElementById('newWebUser').value.trim();
+            let p = document.getElementById('newWebPass').value.trim();
+            let allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
+            if(u && p) {
+                allUsers[u] = { password: p };
+                localStorage.setItem('allUsers', JSON.stringify(allUsers));
+                alert("Account Created!"); location.reload();
+            }
+        }
+
+        function checkLogin() {
+            let u = document.getElementById('userInp').value.trim();
+            let p = document.getElementById('passInp').value.trim();
+            let allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
+            if (allUsers[u] && allUsers[u].password === p) {
+                currentActiveUser = u; accessGranted();
+            } else { alert("Wrong Credentials!"); }
+        }
+
+        function requestOTP() {
+            let u = document.getElementById('forgotUser').value.trim();
+            let allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
+            if(allUsers[u]) {
+                generatedOTP = Math.floor(1000 + Math.random() * 9000).toString();
+                alert("OTP for " + u + " is: " + generatedOTP);
+                document.getElementById('otpBtn').style.display = 'none';
+                document.getElementById('otpBox').style.display = 'block';
+            }
+        }
+
+        function verifyOTP() {
+            if(document.getElementById('otpInp').value === generatedOTP) {
+                currentActiveUser = document.getElementById('forgotUser').value;
+                accessGranted();
+            }
+        }
+
+        function accessGranted() {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            document.getElementById('currentUserDisplay').innerText = currentActiveUser;
+            generateTable(); loadFromStorage();
+        }
+
+        function logout() { location.reload(); }
+
+        function unlockSalary() {
+            let pass = prompt("Enter Password:");
+            let allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
+            if (pass === allUsers[currentActiveUser].password) {
+                document.getElementById('privateSalarySection').style.display = 'block';
+                calculate();
+            } else { alert("Incorrect Password!"); }
+        }
+
+        function calculate() {
+            let grandTotal = 0; let nightDaysCount = 0;
+            let stdHour = parseFloat(document.getElementById('targetHour').value) || 1;
+            let basic = parseFloat(document.getElementById('baseSalary').value) || 0;
+
+            document.querySelectorAll('#attendance-body tr').forEach(row => {
+                const inT = parseTime(row.querySelector('.in-time').value);
+                const outT = parseTime(row.querySelector('.out-time').value);
+                const isNight = row.querySelector('.night-check').checked;
+                if (!isNaN(inT) && !isNaN(outT)) {
+                    let diff = outT - inT; if(diff < 0) diff += 24;
+                    row.querySelector('.row-total').innerText = diff.toFixed(2);
+                    grandTotal += diff;
+                }
+                if(isNight) nightDaysCount++;
+            });
+
+            document.getElementById('totalDisplay').innerText = grandTotal.toFixed(2);
+            let hourlyRate = basic / stdHour;
+            let otPay = Math.max(0, grandTotal - stdHour) * (hourlyRate * 2); 
+            let nightPay = nightDaysCount * 150;
+            let finalSalary = (grandTotal < stdHour) ? (grandTotal * hourlyRate) + nightPay : basic + otPay + nightPay;
+
+            document.getElementById('otPayDisplay').innerText = "₹" + otPay.toFixed(2);
+            document.getElementById('nightPayDisplay').innerText = "₹" + nightPay.toFixed(2);
+            document.getElementById('salaryDisplay').innerText = finalSalary.toFixed(2);
+            saveToStorage();
+        }
+
+        function parseTime(t) {
+            t = (t || "").toUpperCase().replace(/\s/g, ''); if(!t) return NaN;
+            let mod = t.includes('PM') ? 'PM' : 'AM';
+            let [h, m] = t.replace('AM', '').replace('PM', '').split(':').map(Number);
+            if (mod === 'PM' && h !== 12) h += 12; if (mod === 'AM' && h === 12) h = 0;
+            return h + (m || 0)/60;
+        }
+
+        function generateTable() {
+            const tbody = document.getElementById('attendance-body'); tbody.innerHTML = '';
+            for (let d = 1; d <= 31; d++) {
+                tbody.innerHTML += `<tr>
+                    <td>${d}</td>
+                    <td><input type="text" class="in-time in-out-input" placeholder="9 AM" oninput="calculate()"></td>
+                    <td><input type="text" class="out-time in-out-input" placeholder="6 PM" oninput="calculate()"></td>
+                    <td class="row-total">0.00</td>
+                    <td><input type="checkbox" class="night-check" onchange="calculate()"></td>
+                    <td><button class="btn-lock" onclick="toggleRowLock(this)">Lock</button></td>
+                </tr>`;
+            }
+        }
+
+        function toggleRowLock(btn) {
+            let pass = prompt("Enter Password:");
+            let allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
+            if (pass === allUsers[currentActiveUser].password) {
+                let row = btn.closest('tr'); let inputs = row.querySelectorAll('input');
+                let isLocked = inputs[0].disabled;
+                inputs.forEach(i => i.disabled = !isLocked);
+                btn.innerText = isLocked ? "Lock" : "Unlock";
+                btn.style.backgroundColor = isLocked ? "#2874f0" : "#666";
+                saveToStorage();
+            } else { alert("Incorrect Password!"); }
+        }
+
+        function saveToStorage() {
+            const month = document.getElementById('monthSelect').value;
+            const data = [];
+            document.querySelectorAll('#attendance-body tr').forEach(row => {
+                data.push({ 
+                    in: row.querySelector('.in-time').value, 
+                    out: row.querySelector('.out-time').value, 
+                    night: row.querySelector('.night-check').checked, 
+                    locked: row.querySelector('.in-time').disabled 
+                });
+            });
+            localStorage.setItem(`data_${currentActiveUser}_${month}`, JSON.stringify(data));
+        }
+
+        function loadFromStorage() {
+            const month = document.getElementById('monthSelect').value;
+            const saved = JSON.parse(localStorage.getItem(`data_${currentActiveUser}_${month}`));
+            if (saved) {
+                const rows = document.querySelectorAll('#attendance-body tr');
+                saved.forEach((item, i) => {
+                    if(rows[i]) {
+                        rows[i].querySelector('.in-time').value = item.in || "";
+                        rows[i].querySelector('.out-time').value = item.out || "";
+                        rows[i].querySelector('.night-check').checked = item.night;
+                        if(item.locked) {
+                            rows[i].querySelectorAll('input').forEach(inp => inp.disabled = true);
+                            rows[i].querySelector('.btn-lock').innerText = "Unlock";
+                        }
+                    }
+                });
+                calculate();
+            }
+        }
+    </script>
+</body>
+</html>
