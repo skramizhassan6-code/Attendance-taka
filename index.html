@@ -55,6 +55,7 @@
     <div id="loginOverlay">
         <div class="login-box">
             <h2 id="boxTitle">Account Login</h2>
+            
             <div id="loginForm">
                 <input type="text" id="userInp" placeholder="Username">
                 <input type="password" id="passInp" placeholder="Password">
@@ -62,15 +63,27 @@
                 <span class="toggle-link" onclick="toggleForm('signup')">Create New Account</span>
                 <span class="toggle-link" style="font-size:12px; color:#888;" onclick="toggleForm('forgot')">Forgot Password?</span>
             </div>
+
             <div id="signupForm" style="display:none;">
                 <input type="text" id="newWebUser" placeholder="Set Username">
                 <input type="password" id="newWebPass" placeholder="Set Password">
                 <button onclick="saveSignup()">Register Account</button>
                 <span class="toggle-link" onclick="toggleForm('login')">Back to Login</span>
             </div>
+
             <div id="forgotForm" style="display:none;">
                 <input type="text" id="forgotUser" placeholder="Confirm Username">
-                <div id="otpBox" style="display:none;"><input type="number" id="otpInp" placeholder="Enter OTP"> <button onclick="verifyOTP()">Verify OTP</button></div>
+                
+                <div id="otpBox" style="display:none;">
+                    <input type="number" id="otpInp" placeholder="Enter OTP"> 
+                    <button onclick="verifyOTP()">Verify OTP</button>
+                </div>
+
+                <div id="newPassBox" style="display:none;">
+                    <input type="password" id="resetPassInp" placeholder="Enter New Password">
+                    <button onclick="saveNewPassword()">Update Password</button>
+                </div>
+
                 <button id="otpBtn" onclick="requestOTP()">Get Mock OTP</button>
                 <span class="toggle-link" onclick="location.reload()">Cancel</span>
             </div>
@@ -88,7 +101,6 @@
             <div class="std-hour-box">
                 <span style="font-size: 10px; font-weight: bold;">Std Hr:</span>
                 <input type="number" id="targetHour" value="200" oninput="calculate()" style="width:35px; font-size: 10px;">
-                
                 <select id="monthSelect" onchange="generateTable(); loadFromStorage();" style="padding: 2px; font-size: 10px;">
                     <option value="January">January</option>
                     <option value="February">February</option>
@@ -127,6 +139,7 @@
     <script>
         let currentActiveUser = "";
         let generatedOTP = "";
+        let resetUserTemp = "";
 
         function toggleForm(type) {
             document.getElementById('loginForm').style.display = type === 'login' ? 'block' : 'none';
@@ -155,22 +168,38 @@
             } else { alert("Wrong Credentials!"); }
         }
 
+        // --- FORGOT PASSWORD LOGIC ---
         function requestOTP() {
             let u = document.getElementById('forgotUser').value.trim();
             let allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
             if(allUsers[u]) {
+                resetUserTemp = u; // User ko yaad rakho password reset ke liye
                 generatedOTP = Math.floor(1000 + Math.random() * 9000).toString();
                 alert("OTP for " + u + " is: " + generatedOTP);
                 document.getElementById('otpBtn').style.display = 'none';
                 document.getElementById('otpBox').style.display = 'block';
-            }
+            } else { alert("Username not found!"); }
         }
 
         function verifyOTP() {
             if(document.getElementById('otpInp').value === generatedOTP) {
-                currentActiveUser = document.getElementById('forgotUser').value;
-                accessGranted();
-            }
+                alert("OTP Verified! Now set your new password.");
+                document.getElementById('otpBox').style.display = 'none';
+                document.getElementById('forgotUser').disabled = true;
+                document.getElementById('newPassBox').style.display = 'block';
+            } else { alert("Invalid OTP!"); }
+        }
+
+        function saveNewPassword() {
+            let newP = document.getElementById('resetPassInp').value.trim();
+            if(newP.length < 4) { alert("Password must be at least 4 chars!"); return; }
+            
+            let allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
+            allUsers[resetUserTemp].password = newP;
+            localStorage.setItem('allUsers', JSON.stringify(allUsers));
+            
+            alert("Password updated successfully! Please login.");
+            location.reload();
         }
 
         function accessGranted() {
@@ -182,6 +211,7 @@
 
         function logout() { location.reload(); }
 
+        // --- REST OF TRACKER LOGIC ---
         function unlockSalary() {
             let pass = prompt("Enter Password:");
             let allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
@@ -259,12 +289,7 @@
             const month = document.getElementById('monthSelect').value;
             const data = [];
             document.querySelectorAll('#attendance-body tr').forEach(row => {
-                data.push({ 
-                    in: row.querySelector('.in-time').value, 
-                    out: row.querySelector('.out-time').value, 
-                    night: row.querySelector('.night-check').checked, 
-                    locked: row.querySelector('.in-time').disabled 
-                });
+                data.push({ in: row.querySelector('.in-time').value, out: row.querySelector('.out-time').value, night: row.querySelector('.night-check').checked, locked: row.querySelector('.in-time').disabled });
             });
             localStorage.setItem(`data_${currentActiveUser}_${month}`, JSON.stringify(data));
         }
